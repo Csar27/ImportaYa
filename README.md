@@ -12,7 +12,7 @@ Cargar miles de usuarios desde un archivo no puede bloquear la petición HTTP. I
 ## Alcance implementado
 
 - **Backend (Fase 1):** API REST, parsers streaming CSV/XLSX detrás de `IFileParser`, validación en español, deduplicación por `(tipoDocumento, documento)` en archivo y base de datos, inserción por lotes con `SqlBulkCopy` (200 filas), TVP para consultar existentes, `BackgroundService` + `Channel<Guid>`, log con filtro/paginación/descarga y plantillas.
-- **Seguridad (Fase 2):** cuentas persistentes (`Accounts`), roles `Admin`/`Usuario`, contraseñas con PBKDF2, JWT HS256, seeder de administrador por variables de entorno, endpoints `/api/auth/*` y `/api/accounts`, y autorización en todos los endpoints de importación. CORS restringido a los orígenes del frontend.
+- **Seguridad (Fase 2):** cuentas persistentes (`Accounts`), roles `Admin`/`Usuario`, contraseñas con PBKDF2, JWT HS256, seeder de administrador por variables de entorno, registro público que siempre crea `Usuario`, endpoints `/api/auth/*` y `/api/accounts`, y autorización en todos los endpoints de importación. CORS restringido a los orígenes del frontend.
 - **Frontend (Fase 4):** Angular 21 standalone + Angular Material, login, shell con navegación según rol, carga por arrastrar y soltar, progreso por sondeo del endpoint de estado, contadores, historial, log filtrable y descargas, y administración de cuentas.
 
 ## Arquitectura
@@ -190,7 +190,7 @@ cd frontend
 npm test -- --watch=false
 ```
 
-Backend: **22 de dominio + 15 de aplicación + 14 de infraestructura + 12 de integración = 63 pruebas**.
+Backend: **22 de dominio + 15 de aplicación + 14 de infraestructura + 14 de integración = 65 pruebas**.
 Frontend: **4 pruebas** (componente raíz y servicio de autenticación).
 
 Las pruebas de integración crean una base de datos LocalDB con nombre aleatorio, siembran el administrador y dos duplicados contra BD, limpian las tablas de importación antes de cada test y eliminan la base al terminar. Incluyen login sin autorización (401), creación de cuenta por Admin, acceso denegado a `Usuario` (403) y las cargas reales de 1.200 filas.
@@ -217,11 +217,12 @@ En una base de datos vacía los duplicados contra BD no existen, por lo que se e
 
 ## Endpoints
 
-Todas las rutas salvo `POST /api/auth/login` requieren `Authorization: Bearer <token>`.
+Todas las rutas salvo `POST /api/auth/login` y `POST /api/auth/register` requieren `Authorization: Bearer <token>`.
 
 | Método | Ruta | Roles | Descripción |
 | --- | --- | --- | --- |
 | `POST` | `/api/auth/login` | público | Devuelve `{ token, expiresAt, email, displayName, role }`. |
+| `POST` | `/api/auth/register` | público | Crea una cuenta con rol fijo `Usuario` (nunca Admin) y devuelve la cuenta creada. |
 | `GET` | `/api/auth/me` | Admin, Usuario | Claims del usuario autenticado. |
 | `GET` | `/api/accounts` | Admin | Lista de cuentas. |
 | `POST` | `/api/accounts` | Admin | Crea una cuenta con email, contraseña (≥8), nombre y rol. |
