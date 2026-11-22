@@ -1,0 +1,103 @@
+@use '@angular/material' as mat;
+
+html {
+  color-scheme: light;
+  @include mat.theme(
+    (
+      color: mat.$azure-palette,
+      typography: Roboto,
+      density: 0,
+    )
+  );
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #f3f6fb;
+  color: #182230;
+  font-family: Roboto, 'Helvetica Neue', sans-serif;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+
+.page {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 28px 24px 56px;
+}
+
+.page-title {
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-bottom: 4px;
+}
+
+.page-subtitle {
+  color: #637083;
+  margin-bottom: 24px;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #e4e9f2;
+  border-radius: 16px;
+  box-shadow: 0 6px 24px rgba(21, 40, 75, 0.05);
+}
+
+.muted {
+  color: #6b7789;
+}
+
+.mono {
+  font-family: 'Roboto Mono', ui-monospace, monospace;
+  font-size: 12px;
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-queued {
+  background: #eef2f7;
+  color: #52627a;
+}
+
+.status-processing {
+  background: #e8f1ff;
+  color: #1f5fbf;
+}
+
+.status-completed {
+  background: #e6f6ec;
+  color: #1b7f45;
+}
+
+.status-failed {
+  background: #fdeaea;
+  color: #b42318;
+}
+
+.mat-mdc-form-field {
+  width: 100%;
+}

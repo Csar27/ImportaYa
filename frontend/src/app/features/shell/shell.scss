@@ -1,0 +1,82 @@
+.app-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #10233f;
+  color: #fff;
+  box-shadow: 0 2px 12px rgba(9, 26, 51, 0.22);
+  gap: 12px;
+  padding-inline: 24px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #3b82f6, #22d3ee);
+  color: #fff;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 28px;
+
+  a {
+    color: #cfdaea;
+  }
+
+  .nav-active {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+  }
+}
+
+.user-block {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.user-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+  text-align: right;
+
+  strong {
+    font-size: 13px;
+  }
+
+  small {
+    color: #9fb3cf;
+    font-size: 11px;
+  }
+}
+
+main {
+  min-height: calc(100vh - 64px);
+}
+
+@media (max-width: 720px) {
+  .nav-links {
+    margin-left: 8px;
+  }
+
+  .user-meta {
+    display: none;
+  }
+}

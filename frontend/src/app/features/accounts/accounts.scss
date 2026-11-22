@@ -1,0 +1,79 @@
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  margin-bottom: 18px;
+  font-size: 14px;
+}
+
+.banner-error {
+  background: #fdeaea;
+  color: #b42318;
+}
+
+.banner-success {
+  background: #e6f6ec;
+  color: #1b7f45;
+}
+
+.accounts-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 0.6fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.card {
+  mat-card-header {
+    padding: 20px 22px 8px;
+  }
+
+  mat-card-content {
+    padding: 8px 22px 20px;
+  }
+}
+
+.table-wrapper {
+  overflow-x: auto;
+}
+
+.wide-table {
+  width: 100%;
+
+  th {
+    color: #52627a;
+    background: #f7f9fd;
+    font-weight: 600;
+  }
+}
+
+.role-pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #eef2f7;
+  color: #52627a;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.role-admin {
+  background: #e8f1ff;
+  color: #1f5fbf;
+}
+
+.account-form {
+  display: grid;
+  gap: 4px;
+
+  button {
+    margin-top: 8px;
+  }
+}
+
+@media (max-width: 1000px) {
+  .accounts-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,35 @@
+<mat-toolbar class="app-bar">
+  <div class="brand" routerLink="/imports">
+    <span class="brand-mark"><mat-icon>cloud_upload</mat-icon></span>
+    <span>ImportaYa</span>
+  </div>
+
+  <nav class="nav-links">
+    <a mat-button routerLink="/imports" routerLinkActive="nav-active">
+      <mat-icon>upload_file</mat-icon>
+      Importar
+    </a>
+    @if (auth.isAdmin()) {
+      <a mat-button routerLink="/accounts" routerLinkActive="nav-active">
+        <mat-icon>group</mat-icon>
+        Usuarios y roles
+      </a>
+    }
+  </nav>
+
+  <span class="spacer"></span>
+
+  <div class="user-block">
+    <div class="user-meta">
+      <strong>{{ auth.user()?.displayName || 'Usuario' }}</strong>
+      <small>{{ auth.user()?.role }}</small>
+    </div>
+    <button mat-icon-button (click)="auth.logout()" aria-label="Cerrar sesión" matTooltip="Cerrar sesión">
+      <mat-icon>logout</mat-icon>
+    </button>
+  </div>
+</mat-toolbar>
+
+<main>
+  <router-outlet />
+</main>

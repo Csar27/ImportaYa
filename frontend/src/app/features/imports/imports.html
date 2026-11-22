@@ -1,0 +1,308 @@
+<div class="page">
+  <header class="page-header">
+    <div>
+      <h1 class="page-title">Importación masiva de usuarios</h1>
+      <p class="page-subtitle">
+        Adjunte un CSV o XLSX con las columnas tipoDocumento, documento, nombre, email y telefono.
+      </p>
+    </div>
+  </header>
+
+  @if (error()) {
+    <div class="banner banner-error" role="alert">
+      <mat-icon>error_outline</mat-icon>
+      <span>{{ error() }}</span>
+      <button mat-icon-button (click)="error.set(null)" aria-label="Cerrar aviso">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+  }
+
+  @if (notice()) {
+    <div class="banner banner-success" role="status">
+      <mat-icon>check_circle_outline</mat-icon>
+      <span>{{ notice() }}</span>
+      <button mat-icon-button (click)="notice.set(null)" aria-label="Cerrar aviso">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+  }
+
+  <div class="upload-grid">
+    <mat-card class="card upload-card">
+      <mat-card-header>
+        <mat-card-title>1 · Seleccionar archivo</mat-card-title>
+        <mat-card-subtitle>Máximo 10 MB · hasta 50.000 filas</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <div
+          class="drop-zone"
+          [class.drop-zone-active]="dragging()"
+          (dragover)="onDragOver($event)"
+          (dragleave)="onDragLeave($event)"
+          (drop)="onDrop($event)"
+        >
+          <mat-icon>file_upload</mat-icon>
+          <strong>Arrastre su archivo aquí</strong>
+          <span>o haga clic para buscarlo</span>
+          <input
+            #fileInput
+            type="file"
+            accept=".csv,.xlsx"
+            hidden
+            (change)="onFileSelected($event)"
+          />
+          <button mat-stroked-button type="button" (click)="fileInput.click()">
+            <mat-icon>attach_file</mat-icon>
+            Buscar archivo
+          </button>
+        </div>
+
+        @if (file()) {
+          <div class="selected-file">
+            <mat-icon>description</mat-icon>
+            <div class="selected-file-meta">
+              <strong>{{ file()!.name }}</strong>
+              <small>{{ file()!.size / 1024 | number: '1.0-0' }} KB</small>
+            </div>
+            <button mat-icon-button (click)="clearFile()" matTooltip="Quitar archivo">
+              <mat-icon>delete_outline</mat-icon>
+            </button>
+            <button
+              mat-flat-button
+              class="upload-button"
+              (click)="upload()"
+              [disabled]="uploading()"
+            >
+              @if (uploading()) {
+                <mat-spinner diameter="18" />
+              } @else {
+                Procesar
+              }
+            </button>
+          </div>
+        }
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="card template-card">
+      <mat-card-header>
+        <mat-card-title>2 · Plantillas</mat-card-title>
+        <mat-card-subtitle>Descargue el formato esperado</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <p class="muted template-copy">
+          La primera fila debe contener exactamente los cinco encabezados. El procesamiento
+          continúa aunque algunas filas tengan errores o estén duplicadas.
+        </p>
+        <div class="template-actions">
+          <button mat-stroked-button (click)="downloadTemplate('csv')">
+            <mat-icon>table_chart</mat-icon>
+            Plantilla CSV
+          </button>
+          <button mat-stroked-button (click)="downloadTemplate('xlsx')">
+            <mat-icon>grid_on</mat-icon>
+            Plantilla XLSX
+          </button>
+        </div>
+        <div class="format-note">
+          <mat-icon>info_outline</mat-icon>
+          <span>Los ceros a la izquierda se conservan como texto.</span>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  </div>
+
+  @if (currentJob(); as job) {
+    <mat-card class="card progress-card">
+      <mat-card-header>
+        <mat-card-title>Progreso de la importación</mat-card-title>
+        <mat-card-subtitle>{{ job.fileName }}</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="progress-heading">
+          <span class="status-pill" [class]="'status-pill status-' + job.status.toLowerCase()">
+            {{ job.status }}
+          </span>
+          <span class="muted">
+            {{ job.processedCount | number }} filas procesadas ·
+            {{ job.createdAt | date: 'dd/MM/yyyy HH:mm:ss' }}
+          </span>
+        </div>
+        @if (isActive()) {
+          <mat-progress-bar mode="indeterminate" />
+        } @else {
+          <mat-progress-bar mode="determinate" value="100" />
+        }
+        @if (job.errorMessage) {
+          <p class="error-text">{{ job.errorMessage }}</p>
+        }
+
+        <div class="stats-grid">
+          <div class="stat">
+            <span class="stat-label">Procesadas</span>
+            <strong>{{ job.processedCount | number }}</strong>
+            <mat-icon>playlist_add_check</mat-icon>
+          </div>
+          <div class="stat stat-success">
+            <span class="stat-label">Creadas</span>
+            <strong>{{ job.createdCount | number }}</strong>
+            <mat-icon>person_add</mat-icon>
+          </div>
+          <div class="stat stat-error">
+            <span class="stat-label">Con error</span>
+            <strong>{{ job.errorCount | number }}</strong>
+            <mat-icon>error_outline</mat-icon>
+          </div>
+          <div class="stat stat-warning">
+            <span class="stat-label">Duplicadas</span>
+            <strong>{{ job.duplicateCount | number }}</strong>
+            <mat-icon>content_copy</mat-icon>
+          </div>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  }
+
+  <mat-card class="card history-card">
+    <mat-card-header>
+      <mat-card-title>Historial de importaciones</mat-card-title>
+      <mat-card-subtitle>Seleccione una fila para ver su log</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      <div class="table-wrapper">
+        <table mat-table [dataSource]="jobs()" class="wide-table">
+          <ng-container matColumnDef="fileName">
+            <th mat-header-cell *matHeaderCellDef>Archivo</th>
+            <td mat-cell *matCellDef="let job">
+              <div class="file-cell">
+                <mat-icon>{{ job.format === 'xlsx' ? 'grid_on' : 'description' }}</mat-icon>
+                <span>{{ job.fileName }}</span>
+              </div>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="format">
+            <th mat-header-cell *matHeaderCellDef>Formato</th>
+            <td mat-cell *matCellDef="let job">{{ job.format | uppercase }}</td>
+          </ng-container>
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef>Estado</th>
+            <td mat-cell *matCellDef="let job">
+              <span class="status-pill" [class]="'status-pill status-' + job.status.toLowerCase()">
+                {{ job.status }}
+              </span>
+            </td>
+          </ng-container>
+          <ng-container matColumnDef="processedCount">
+            <th mat-header-cell *matHeaderCellDef>Procesadas</th>
+            <td mat-cell *matCellDef="let job">{{ job.processedCount }}</td>
+          </ng-container>
+          <ng-container matColumnDef="createdCount">
+            <th mat-header-cell *matHeaderCellDef>Creadas</th>
+            <td mat-cell *matCellDef="let job">{{ job.createdCount }}</td>
+          </ng-container>
+          <ng-container matColumnDef="errorCount">
+            <th mat-header-cell *matHeaderCellDef>Errores</th>
+            <td mat-cell *matCellDef="let job">{{ job.errorCount }}</td>
+          </ng-container>
+          <ng-container matColumnDef="duplicateCount">
+            <th mat-header-cell *matHeaderCellDef>Duplicados</th>
+            <td mat-cell *matCellDef="let job">{{ job.duplicateCount }}</td>
+          </ng-container>
+          <ng-container matColumnDef="createdAt">
+            <th mat-header-cell *matHeaderCellDef>Fecha</th>
+            <td mat-cell *matCellDef="let job">{{ job.createdAt | date: 'dd/MM HH:mm' }}</td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="jobColumns"></tr>
+          <tr
+            mat-row
+            *matRowDef="let job; columns: jobColumns"
+            class="clickable-row"
+            [class.row-selected]="job.id === currentJob()?.id"
+            (click)="selectJob(job)"
+          ></tr>
+        </table>
+        @if (jobs().length === 0) {
+          <p class="empty-state">Todavía no hay importaciones. Suba un archivo para comenzar.</p>
+        }
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  @if (currentJob(); as job) {
+    <mat-card class="card log-card">
+      <mat-card-header>
+        <mat-card-title>Log de errores y duplicados</mat-card-title>
+        <mat-card-subtitle>{{ logTotal() | number }} registros</mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="log-toolbar">
+          <mat-form-field appearance="outline" class="filter-field">
+            <mat-label>Filtrar por tipo</mat-label>
+            <mat-select [value]="logFilter() ?? ''" (selectionChange)="changeFilter($event.value)">
+              <mat-option value="">Todos</mat-option>
+              <mat-option value="Error">Errores</mat-option>
+              <mat-option value="Duplicado">Duplicados</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <span class="spacer"></span>
+          <button mat-stroked-button (click)="downloadLog('csv')">
+            <mat-icon>download</mat-icon>
+            CSV
+          </button>
+          <button mat-stroked-button (click)="downloadLog('xlsx')">
+            <mat-icon>download</mat-icon>
+            XLSX
+          </button>
+        </div>
+
+        <div class="table-wrapper">
+          <table mat-table [dataSource]="logs()" class="wide-table">
+            <ng-container matColumnDef="fila">
+              <th mat-header-cell *matHeaderCellDef>Fila</th>
+              <td mat-cell *matCellDef="let entry">{{ entry.fila }}</td>
+            </ng-container>
+            <ng-container matColumnDef="tipo">
+              <th mat-header-cell *matHeaderCellDef>Tipo</th>
+              <td mat-cell *matCellDef="let entry">
+                <span class="log-type" [class.log-type-duplicate]="entry.tipo === 'Duplicado'">
+                  {{ entry.tipo }}
+                </span>
+              </td>
+            </ng-container>
+            <ng-container matColumnDef="tipoDocumento">
+              <th mat-header-cell *matHeaderCellDef>Tipo doc.</th>
+              <td mat-cell *matCellDef="let entry">{{ entry.tipoDocumento }}</td>
+            </ng-container>
+            <ng-container matColumnDef="documento">
+              <th mat-header-cell *matHeaderCellDef>Documento</th>
+              <td mat-cell *matCellDef="let entry" class="mono">{{ entry.documento }}</td>
+            </ng-container>
+            <ng-container matColumnDef="motivo">
+              <th mat-header-cell *matHeaderCellDef>Motivo</th>
+              <td mat-cell *matCellDef="let entry">{{ entry.motivo }}</td>
+            </ng-container>
+            <ng-container matColumnDef="fecha">
+              <th mat-header-cell *matHeaderCellDef>Fecha</th>
+              <td mat-cell *matCellDef="let entry">{{ entry.fecha | date: 'dd/MM HH:mm:ss' }}</td>
+            </ng-container>
+            <tr mat-header-row *matHeaderRowDef="logColumns"></tr>
+            <tr mat-row *matRowDef="let entry; columns: logColumns"></tr>
+          </table>
+          @if (logs().length === 0 && !logLoading()) {
+            <p class="empty-state">No hay incidencias para este filtro.</p>
+          }
+        </div>
+
+        <mat-paginator
+          [length]="logTotal()"
+          [pageIndex]="logPageIndex()"
+          [pageSize]="logPageSize()"
+          [pageSizeOptions]="[10, 25, 50]"
+          (page)="onPage($event)"
+        />
+      </mat-card-content>
+    </mat-card>
+  }
+</div>

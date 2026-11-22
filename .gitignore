@@ -1,0 +1,42 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+# Angular / Node
+node_modules/
+frontend/dist/
+frontend/.angular/
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Configuración local y secretos
+appsettings.Local.json
+appsettings.*.Local.json
+.env
+.env.*
+!.env.example
+*.pfx
+*.snk
+
+# Datos generados en tiempo de ejecución
+App_Data/
+*.mdf
+*.ldf
+
+# IDE / OS / herramientas de prueba
+.idea/
+.vscode/
+.playwright-mcp/
+playwright-report/
+test-results/
+.DS_Store
+Thumbs.db
+
+# Pruebas y cobertura
+TestResults/
+coverage*.xml
+coverage*.json

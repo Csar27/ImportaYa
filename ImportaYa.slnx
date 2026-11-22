@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ImportaYa.Api/ImportaYa.Api.csproj" />
+    <Project Path="src/ImportaYa.Application/ImportaYa.Application.csproj" />
+    <Project Path="src/ImportaYa.Domain/ImportaYa.Domain.csproj" />
+    <Project Path="src/ImportaYa.Infrastructure/ImportaYa.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ImportaYa.Application.Tests/ImportaYa.Application.Tests.csproj" />
+    <Project Path="tests/ImportaYa.Domain.Tests/ImportaYa.Domain.Tests.csproj" />
+    <Project Path="tests/ImportaYa.Infrastructure.Tests/ImportaYa.Infrastructure.Tests.csproj" />
+    <Project Path="tests/ImportaYa.IntegrationTests/ImportaYa.IntegrationTests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/ImportaYa.SampleGenerator/ImportaYa.SampleGenerator.csproj" />
+  </Folder>
+</Solution>
