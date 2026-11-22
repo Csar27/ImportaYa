@@ -8,6 +8,7 @@ import {
   CreateAccountRequest,
   CreateImportResult,
   CurrentUser,
+  ImportedUser,
   ImportJob,
   ImportLogEntry,
   LoginRequest,
@@ -84,6 +85,14 @@ export class ApiService {
       params: new HttpParams().set('formato', format),
       responseType: 'blob',
     });
+  }
+
+  listUsers(search: string, page = 1, pageSize = 20): Observable<PagedResult<ImportedUser>> {
+    let params = new HttpParams().set('page', page).set('pageSize', pageSize);
+    if (search.trim()) {
+      params = params.set('q', search.trim());
+    }
+    return this.http.get<PagedResult<ImportedUser>>(`${this.baseUrl}/users`, { params });
   }
 
   listAccounts(): Observable<Account[]> {

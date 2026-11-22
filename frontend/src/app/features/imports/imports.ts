@@ -15,7 +15,8 @@ import { Subscription, switchMap, takeWhile, timer } from 'rxjs';
 
 import { ApiService } from '../../core/api.service';
 import { extractErrorMessage } from '../../core/error';
-import { ImportJob, ImportLogEntry, LogTipo } from '../../core/models';
+import { ImportJob, ImportLogEntry, ImportProgressEvent, LogTipo } from '../../core/models';
+import { ImportProgressService } from '../../core/progress.service';
 
 const ALLOWED_EXTENSIONS = ['csv', 'xlsx'];
 
@@ -42,6 +43,7 @@ const ALLOWED_EXTENSIONS = ['csv', 'xlsx'];
 })
 export class Imports {
   private readonly api = inject(ApiService);
+  private readonly progress = inject(ImportProgressService);
   private readonly destroyRef = inject(DestroyRef);
   private pollSubscription: Subscription | null = null;
 
@@ -79,6 +81,9 @@ export class Imports {
 
   constructor() {
     this.loadHistory();
+    this.progress.progress$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((event) => this.onProgress(event));
   }
 
   onFileSelected(event: Event): void {
@@ -149,7 +154,7 @@ export class Imports {
         this.file.set(null);
         this.notice.set(`Importación ${result.jobId} recibida. Procesando en segundo plano…`);
         this.loadHistory();
-        this.pollJob(result.jobId);
+        void this.trackJob(result.jobId);
       },
       error: (error: unknown) => {
         this.uploading.set(false);
@@ -168,6 +173,10 @@ export class Imports {
     this.logPageIndex.set(0);
     this.logFilter.set(null);
     this.loadLogs();
+
+    if (job.status === 'Queued' || job.status === 'Processing') {
+      void this.progress.joinJob(job.id).catch(() => this.pollJob(job.id));
+    }
   }
 
   changeFilter(value: string): void {
@@ -210,6 +219,57 @@ export class Imports {
       });
   }
 
+  private async trackJob(jobId: string): Promise<void> {
+    try {
+      await this.progress.joinJob(jobId);
+      this.api.getJob(jobId)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (job) => this.currentJob.set(job),
+          error: () => this.pollJob(jobId),
+        });
+    } catch {
+      this.error.set('SignalR no disponible; se consulta el progreso cada 800 ms.');
+      this.pollJob(jobId);
+    }
+  }
+
+  private onProgress(event: ImportProgressEvent): void {
+    let job = this.currentJob();
+    if (!job || job.id !== event.jobId) {
+      const fromHistory = this.jobs().find((item) => item.id === event.jobId);
+      if (!fromHistory) {
+        return;
+      }
+      job = fromHistory;
+      this.currentJob.set(job);
+    }
+
+    const terminal = event.status === 'Completed' || event.status === 'Failed';
+    this.currentJob.set({
+      ...job,
+      status: event.status,
+      processedCount: event.processed,
+      createdCount: event.created,
+      errorCount: event.errors,
+      duplicateCount: event.duplicates,
+      startedAt: job.startedAt ?? new Date().toISOString(),
+      completedAt: terminal ? job.completedAt ?? new Date().toISOString() : job.completedAt,
+    });
+
+    if (terminal) {
+      void this.progress.leaveJob(event.jobId);
+      this.loadHistory();
+      this.logPageIndex.set(0);
+      this.loadLogs();
+      this.notice.set(
+        event.status === 'Completed'
+          ? `Importación finalizada: ${event.created} usuarios creados.`
+          : `Importación fallida: ${event.errors} filas con error.`,
+      );
+    }
+  }
+
   private pollJob(jobId: string): void {
     this.pollSubscription?.unsubscribe();
 
@@ -224,6 +284,7 @@ export class Imports {
           this.currentJob.set(job);
           this.loadHistory();
           if (job.status !== 'Queued' && job.status !== 'Processing') {
+            void this.progress.leaveJob(jobId);
             this.notice.set(
               job.status === 'Completed'
                 ? `Importación finalizada: ${job.createdCount} usuarios creados.`

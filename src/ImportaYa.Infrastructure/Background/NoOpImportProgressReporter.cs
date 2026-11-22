@@ -3,7 +3,7 @@ using ImportaYa.Application.Models;
 
 namespace ImportaYa.Infrastructure.Background;
 
-/// <summary>Implementación temporal: el progreso ya se persiste en ImportJob. SignalR llega en la Fase 3.</summary>
+/// <summary>Implementación de respaldo sin notificaciones; el progreso sigue persistiéndose en ImportJob.</summary>
 public sealed class NoOpImportProgressReporter : IImportProgressReporter
 {
     public Task ReportAsync(ImportProgress progress, CancellationToken cancellationToken = default) =>

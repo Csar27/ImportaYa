@@ -6,6 +6,7 @@ using ImportaYa.Infrastructure.Background;
 using ImportaYa.Infrastructure.Files;
 using ImportaYa.Infrastructure.Persistence;
 using ImportaYa.Infrastructure.Persistence.Repositories;
+using ImportaYa.Infrastructure.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -27,6 +28,7 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<AppDbContext>());
         services.AddScoped<IImportJobRepository, ImportJobRepository>();
         services.AddScoped<IImportLogRepository, ImportLogRepository>();
+        services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IAccountRepository, AccountRepository>();
         services.AddScoped<IPasswordHasher, PasswordHasher>();
         services.AddSingleton<ITokenService, JwtTokenService>();
@@ -41,7 +43,7 @@ public static class DependencyInjection
 
         services.AddSingleton<ChannelImportQueue>();
         services.AddSingleton<IImportQueue>(sp => sp.GetRequiredService<ChannelImportQueue>());
-        services.AddSingleton<IImportProgressReporter, NoOpImportProgressReporter>();
+        services.AddSingleton<IImportProgressReporter, SignalRImportProgressReporter>();
         services.AddHostedService<ImportWorker>();
 
         return services;

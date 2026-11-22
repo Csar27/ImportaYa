@@ -167,6 +167,25 @@ public sealed class ImportFlowTests : IClassFixture<IntegrationFixture>, IAsyncL
         history.Items.Should().Contain(j => j.Id == jobId);
     }
 
+    [Fact]
+    public async Task Imported_users_can_be_listed_and_searched()
+    {
+        var jobId = await UploadInlineAsync("""
+            tipoDocumento,documento,nombre,email,telefono
+            CC,7777777777,Usuar Listado,listado@demo.com,3007777777
+            """);
+        await WaitForCompletionAsync(jobId);
+
+        var all = await _client.GetFromJsonAsync<PagedResult<UserDto>>("/api/users?pageSize=10");
+        all!.Total.Should().BeGreaterThanOrEqualTo(3);
+
+        var found = await _client.GetFromJsonAsync<PagedResult<UserDto>>("/api/users?q=listado@demo.com");
+        found!.Total.Should().Be(1);
+        found.Items[0].Documento.Should().Be("7777777777");
+        found.Items[0].Nombre.Should().Be("Usuar Listado");
+        found.Items[0].TipoDocumento.Should().Be("CC");
+    }
+
     private async Task<Guid> UploadSampleAsync(string fileName)
     {
         var path = Path.Combine(AppContext.BaseDirectory, "samples", fileName);

@@ -21,6 +21,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/imports/imports').then((m) => m.Imports),
       },
       {
+        path: 'users',
+        title: 'ImportaYa · Usuarios importados',
+        loadComponent: () => import('./features/users/users').then((m) => m.Users),
+      },
+      {
         path: 'accounts',
         title: 'ImportaYa · Usuarios y roles',
         canActivate: [adminGuard],

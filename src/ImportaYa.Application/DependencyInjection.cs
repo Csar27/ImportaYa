@@ -12,6 +12,7 @@ public static class DependencyInjection
         services.AddScoped<ImportService>();
         services.AddScoped<IImportProcessor, ImportProcessor>();
         services.AddScoped<ImportQueryService>();
+        services.AddScoped<UserQueryService>();
         services.AddScoped<IUserRowValidator, UserRowValidator>();
         services.AddScoped<AuthService>();
         services.AddScoped<AccountService>();

@@ -9,6 +9,10 @@
       <mat-icon>upload_file</mat-icon>
       Importar
     </a>
+    <a mat-button routerLink="/users" routerLinkActive="nav-active">
+      <mat-icon>people</mat-icon>
+      Usuarios importados
+    </a>
     @if (auth.isAdmin()) {
       <a mat-button routerLink="/accounts" routerLinkActive="nav-active">
         <mat-icon>group</mat-icon>

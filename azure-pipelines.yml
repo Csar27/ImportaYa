@@ -1,0 +1,144 @@
+trigger:
+  branches:
+    include:
+      - main
+
+pr:
+  branches:
+    include:
+      - main
+
+variables:
+  buildConfiguration: 'Release'
+  dotnetVersion: '10.0.x'
+  nodeVersion: '22.x'
+  windowsImage: 'windows-latest'
+  linuxImage: 'ubuntu-latest'
+  apiImageName: 'importaya-api'
+  frontendImageName: 'importaya-frontend'
+  # Configurar en la UI del pipeline como variables de pipeline:
+  # dockerRegistryServiceConnection = nombre de la service connection de ACR
+  # azureContainerRegistry          = tu-registro.azurecr.io (solo documentación)
+  dockerRegistryServiceConnection: ''
+
+stages:
+  - stage: Build_and_Test
+    displayName: 'Compilar y probar'
+    jobs:
+      - job: Backend
+        displayName: 'Backend .NET + SQL LocalDB'
+        pool:
+          vmImage: $(windowsImage)
+        steps:
+          - task: UseDotNet@2
+            displayName: 'Instalar SDK de .NET'
+            inputs:
+              packageType: 'sdk'
+              version: $(dotnetVersion)
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Restaurar'
+            inputs:
+              command: 'restore'
+              projects: 'ImportaYa.slnx'
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Compilar'
+            inputs:
+              command: 'build'
+              projects: 'ImportaYa.slnx'
+              arguments: '-c $(buildConfiguration) --no-restore'
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Pruebas unitarias e integración'
+            inputs:
+              command: 'test'
+              projects: 'ImportaYa.slnx'
+              arguments: '-c $(buildConfiguration) --no-build --logger trx --results-directory $(Agent.TempDirectory)'
+              publishTestResults: false
+
+          - task: PublishTestResults@2
+            displayName: 'Publicar resultados'
+            condition: succeededOrFailed()
+            inputs:
+              testResultsFormat: 'VSTest'
+              testResultsFiles: '**/*.trx'
+              searchFolder: '$(Agent.TempDirectory)'
+              failTaskOnFailedTests: true
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Publicar API'
+            inputs:
+              command: 'publish'
+              publishWebProjects: false
+              projects: 'src/ImportaYa.Api/ImportaYa.Api.csproj'
+              arguments: '-c $(buildConfiguration) -o $(Build.ArtifactStagingDirectory)/api --no-build'
+              zipAfterPublish: false
+
+          - task: PublishPipelineArtifact@1
+            displayName: 'Publicar artefacto de la API'
+            inputs:
+              targetPath: '$(Build.ArtifactStagingDirectory)/api'
+              artifact: 'api'
+
+      - job: Frontend
+        displayName: 'Frontend Angular + Material'
+        pool:
+          vmImage: $(linuxImage)
+        steps:
+          - task: NodeTool@0
+            displayName: 'Instalar Node.js'
+            inputs:
+              versionSpec: $(nodeVersion)
+
+          - script: npm ci
+            displayName: 'Instalar dependencias'
+            workingDirectory: '$(Build.SourcesDirectory)/frontend'
+
+          - script: npm run build
+            displayName: 'Compilar Angular'
+            workingDirectory: '$(Build.SourcesDirectory)/frontend'
+
+          - script: npm test -- --watch=false
+            displayName: 'Pruebas del frontend'
+            workingDirectory: '$(Build.SourcesDirectory)/frontend'
+
+          - task: PublishPipelineArtifact@1
+            displayName: 'Publicar artefacto del frontend'
+            inputs:
+              targetPath: '$(Build.SourcesDirectory)/frontend/dist/importaya/browser'
+              artifact: 'frontend'
+
+  - stage: Docker
+    displayName: 'Imágenes Docker (opcional)'
+    dependsOn: Build_and_Test
+    condition: and(succeeded(), ne(variables['dockerRegistryServiceConnection'], ''))
+    jobs:
+      - job: Images
+        displayName: 'Publicar imágenes en ACR'
+        pool:
+          vmImage: $(linuxImage)
+        steps:
+          - task: Docker@2
+            displayName: 'API'
+            inputs:
+              containerRegistry: '$(dockerRegistryServiceConnection)'
+              repository: '$(apiImageName)'
+              command: 'buildAndPush'
+              Dockerfile: 'Dockerfile'
+              buildContext: '$(Build.SourcesDirectory)'
+              tags: |
+                $(Build.BuildId)
+                latest
+
+          - task: Docker@2
+            displayName: 'Frontend'
+            inputs:
+              containerRegistry: '$(dockerRegistryServiceConnection)'
+              repository: '$(frontendImageName)'
+              command: 'buildAndPush'
+              Dockerfile: 'frontend/Dockerfile'
+              buildContext: '$(Build.SourcesDirectory)'
+              tags: |
+                $(Build.BuildId)
+                latest

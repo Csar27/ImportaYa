@@ -1,0 +1,100 @@
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  margin-bottom: 18px;
+  font-size: 14px;
+}
+
+.banner-error {
+  background: #fdeaea;
+  color: #b42318;
+}
+
+.total-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: #eaf3ff;
+  color: #1f5fbf;
+  font-size: 13px;
+
+  mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.card {
+  mat-card-content {
+    padding: 18px 22px 12px;
+  }
+}
+
+.search-field {
+  width: min(100%, 460px);
+  margin-bottom: 12px;
+}
+
+.loading,
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 220px;
+  color: #66758c;
+  text-align: center;
+}
+
+.empty {
+  mat-icon {
+    font-size: 42px;
+    width: 42px;
+    height: 42px;
+    color: #9aa8bd;
+  }
+
+  strong {
+    color: #26344a;
+  }
+
+  span {
+    max-width: 380px;
+    font-size: 13px;
+  }
+}
+
+.table-wrapper {
+  overflow-x: auto;
+}
+
+.wide-table {
+  width: 100%;
+
+  th {
+    color: #52627a;
+    background: #f7f9fd;
+    font-weight: 600;
+  }
+}
+
+.type-pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #eef2f7;
+  color: #52627a;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.03em;
+}

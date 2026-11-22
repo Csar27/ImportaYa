@@ -1,7 +1,6 @@
 # ImportaYa — importación asíncrona de usuarios
 
-> **Estado: Fases 1, 2 y 4 completadas.** Backend con JWT/roles, API protegida y frontend Angular + Material funcionando de extremo a extremo.
-> Pendientes: SignalR (Fase 3), Docker (Fase 5) y Azure DevOps (Fase 6).
+> **Estado: Fases 1 a 6 completadas.** API .NET 8 con JWT/roles, procesamiento asíncrono, progreso en tiempo real con SignalR, frontend Angular + Material, Docker Compose y pipeline de Azure DevOps.
 
 **Repositorio:** https://github.com/Csar27/ImportaYa · **Licencia:** MIT ([LICENSE](LICENSE))
 
@@ -13,13 +12,17 @@ Cargar miles de usuarios desde un archivo no puede bloquear la petición HTTP. I
 
 - **Backend (Fase 1):** API REST, parsers streaming CSV/XLSX detrás de `IFileParser`, validación en español, deduplicación por `(tipoDocumento, documento)` en archivo y base de datos, inserción por lotes con `SqlBulkCopy` (200 filas), TVP para consultar existentes, `BackgroundService` + `Channel<Guid>`, log con filtro/paginación/descarga y plantillas.
 - **Seguridad (Fase 2):** cuentas persistentes (`Accounts`), roles `Admin`/`Usuario`, contraseñas con PBKDF2, JWT HS256, seeder de administrador por variables de entorno, registro público que siempre crea `Usuario`, endpoints `/api/auth/*` y `/api/accounts`, y autorización en todos los endpoints de importación. CORS restringido a los orígenes del frontend.
-- **Frontend (Fase 4):** Angular 21 standalone + Angular Material, login, shell con navegación según rol, carga por arrastrar y soltar, progreso por sondeo del endpoint de estado, contadores, historial, log filtrable y descargas, y administración de cuentas.
+- **Tiempo real (Fase 3):** hub SignalR autenticado por trabajo (`/hubs/imports`); `IImportProgressReporter` publica contadores desde el worker sin cambiar `ImportProcessor`. El frontend se suscribe al grupo del job y mantiene sondeo solo como respaldo si falla la conexión.
+- **Frontend (Fase 4):** Angular 21 standalone + Angular Material, login y registro, shell con navegación según rol, carga por arrastrar y soltar, progreso, contadores, historial, log filtrable, descargas, administración de cuentas y listado paginado de **usuarios importados** con búsqueda.
+- **Contenedores (Fase 5):** Dockerfile multi-etapa para la API y el frontend, `docker-compose.yml` con SQL Server 2022, API y Nginx, URL de la API inyectada en runtime mediante `API_URL`.
+- **CI/CD (Fase 6):** `azure-pipelines.yml` con compilación y pruebas en Windows (LocalDB) y Linux (Angular), artefactos y publicación opcional de imágenes a un registro de contenedores.
 
 ## Arquitectura
 
 ```mermaid
 flowchart TB
-    UI[Angular 21 + Material<br/>login, carga, progreso, logs, cuentas] -->|JWT Bearer| Api[ImportaYa.Api<br/>Controllers + CORS + ProblemDetails]
+    UI[Angular 21 + Material<br/>login, carga, progreso, logs, cuentas, usuarios] -->|JWT Bearer| Api[ImportaYa.Api<br/>Controllers + CORS + ProblemDetails]
+    UI -. SignalR .-> Hub[ImportProgressHub<br/>grupo por JobId]
     Api --> App[ImportaYa.Application<br/>Casos de uso, validación, puertos]
     App --> Domain[ImportaYa.Domain<br/>Entidades, enums, reglas puras]
     Infra[ImportaYa.Infrastructure] --> App
@@ -27,6 +30,7 @@ flowchart TB
     Infra --> Storage[Archivos en App_Data/imports]
     Infra --> Worker[ImportWorker<br/>BackgroundService + Channel]
     Worker --> App
+    Worker -->|IImportProgressReporter| Hub
 ```
 
 Capas: **Domain** no depende de nada; **Application** define los puertos (`IFileParser`, `IFileStorage`, `IUserBulkWriter`, `IImportQueue`, `IImportProgressReporter`, `IPasswordHasher`, `ITokenService`); **Infrastructure** implementa parsers, EF Core, SqlBulkCopy, seguridad, almacenamiento y el worker; **Api** expone HTTP. Las dependencias apuntan siempre hacia adentro.
@@ -37,6 +41,7 @@ Capas: **Domain** no depende de nada; **Application** define los puertos (`IFile
 sequenceDiagram
     participant U as Usuario (Angular)
     participant A as API (JWT)
+    participant H as SignalR Hub
     participant Q as Channel
     participant W as Worker
     participant P as Parser
@@ -47,6 +52,7 @@ sequenceDiagram
     A->>D: guarda ImportJob (Queued)
     A->>Q: encola JobId
     A-->>U: 202 Accepted + JobId + Location
+    U->>H: JoinJob(jobId) por WebSocket con JWT
     W->>Q: lee JobId
     W->>P: ParseAsync (IAsyncEnumerable)
     loop lotes de 200 filas
@@ -54,9 +60,10 @@ sequenceDiagram
         W->>W: valida y detecta duplicados del archivo (HashSet)
         W->>D: TVP consulta duplicados en BD
         W->>D: SqlBulkCopy filas válidas + EF Core logs
+        W->>H: progress(JobId, procesadas, creadas, errores, duplicadas)
     end
     W->>D: ImportJob = Completed + contadores
-    U->>A: GET /api/imports/{id} (sondeo de progreso)
+    H-->>U: Completed + contadores finales
     U->>A: GET /api/imports/{id}/log (errores y duplicados)
 ```
 
@@ -85,12 +92,15 @@ sequenceDiagram
 | `SqlBulkCopy` fuera del `DbContext` | Inserciones rápidas por lote; EF Core queda para jobs, logs, cuentas y consultas. |
 | Errores no fatales | Una fila inválida o duplicada se registra y el proceso continúa. |
 | `Channel<Guid>` | Respuesta inmediata y un único consumidor; el id del job viaja por la cola y el archivo ya está persistido. |
-| Progreso persistido + puerto no-op | El frontend consulta el estado por HTTP; `IImportProgressReporter` ya está preparado para SignalR (Fase 3) sin tocar `ImportProcessor`. |
+| Progreso persistido + SignalR | El worker escribe contadores en `ImportJob` y además publica un evento por `IImportProgressReporter`. El hub agrupa clientes por `JobId`; el JWT viaja en `access_token` durante el handshake y CORS habilita credenciales. Si SignalR falla, el frontend vuelve al sondeo HTTP. |
 | Seguridad propia sobre Identity | Se reutiliza `PasswordHasher<Account>` de `Microsoft.Extensions.Identity.Core` para obtener hashes PBKDF2 compatibles, sin acoplar Domain/Application a ASP.NET Core Identity ni arrastrar sus tablas. |
 | Rol como enum convertido a texto | `Admin`/`Usuario` se almacenan como texto legible y se emiten como claim de rol en el JWT; las políticas `ImportAllowed` y `AdminOnly` viven en la API. |
 | Clave JWT fuera del repositorio | `appsettings.Development.json` contiene solo una clave de desarrollo claramente identificada; en producción la API exige `Jwt__Key` (≥32 caracteres). |
 | LocalDB en tests | Docker no estaba disponible en el entorno de desarrollo; se usa SQL Server real (LocalDB) porque `SqlBulkCopy` y los TVP requieren SQL Server, no SQLite. |
 | Angular 21 (no 22) | La versión 22.3 requiere Node ≥24.15; el entorno tiene Node 24.11, así se usa la última rama 21 compatible y estable. |
+| `config.json` en runtime | La URL de la API se lee al arrancar y Docker la sobrescribe con `API_URL`, evitando recompilar el frontend por entorno. |
+| SQL Server en Compose | `SqlBulkCopy` y los TVP exigen SQL Server real; el contenedor `sqlserver` expone 1433 y la API espera a su healthcheck antes de aplicar migraciones. |
+| Pipeline Windows + Linux | Las pruebas de integración necesitan LocalDB (Windows); Angular se compila en Linux. La etapa Docker es opcional y solo se activa si existe una service connection de ACR. |
 
 ## Estructura
 
@@ -98,9 +108,9 @@ sequenceDiagram
 src/
   ImportaYa.Domain/          entidades (User, ImportJob, ImportLog, Account), enums, reglas puras
   ImportaYa.Application/     casos de uso, DTOs, validador, puertos, opciones JWT
-  ImportaYa.Infrastructure/  parsers, EF Core, TVP/BulkCopy, worker, storage, seguridad
+  ImportaYa.Infrastructure/  parsers, EF Core, TVP/BulkCopy, worker, storage, seguridad, SignalR
   ImportaYa.Api/             controllers, CORS, JWT, middleware, appsettings
-frontend/                    Angular 21 standalone + Material (login, imports, accounts)
+frontend/                    Angular 21 standalone + Material (login, imports, users, accounts)
 tests/
   ImportaYa.Domain.Tests/
   ImportaYa.Application.Tests/
@@ -110,6 +120,10 @@ tools/
   ImportaYa.SampleGenerator/    genera samples/usuarios.csv y .xlsx
 samples/                       1.200 filas con errores deliberados
 docs/screenshots/              capturas reales de Swagger y del frontend
+Dockerfile                     imagen multi-etapa de la API
+docker-compose.yml             SQL Server + API + frontend Nginx
+azure-pipelines.yml            CI/CD de Azure DevOps
+.env.example                   plantilla de variables para Docker
 ```
 
 ## Requisitos previos
@@ -133,7 +147,11 @@ docs/screenshots/              capturas reales de Swagger y del frontend
 | `Jwt__ExpiresInMinutes` | `60` | Vigencia del token. |
 | `AdminSeed__Email` / `AdminSeed__Password` | vacíos | Si se definen, se crea el administrador inicial al arrancar. |
 | `AdminSeed__DisplayName` | `Administrador` | Nombre visible del administrador inicial. |
-| `Cors__AllowedOrigins__0` / `__1` | `localhost:4200`, `127.0.0.1:4200` | Orígenes autorizados para el frontend. |
+| `Cors__AllowedOrigins__0` / `__1` | `localhost:4200`, `127.0.0.1:4200` | Orígenes autorizados para el frontend (SignalR requiere credenciales). |
+| `MSSQL_SA_PASSWORD` | `ImportaYa_Sa_12345!` (solo Docker) | Contraseña `sa` del contenedor SQL Server. |
+| `JWT_KEY` | clave de desarrollo | Equivale a `Jwt__Key` en Docker Compose. |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | `admin@demo.com` / `Admin12345` | Equivale a `AdminSeed__*` en Docker Compose. |
+| `API_URL` | `http://localhost:5080/api` | URL que el navegador usa para llamar a la API; se escribe en `config.json` al iniciar Nginx. |
 
 Ejemplo en PowerShell:
 
@@ -182,6 +200,31 @@ Abra `http://localhost:4200`, inicie sesión con el administrador sembrado o cre
 >
 > El puerto `44343` de IIS Express es **HTTPS**: llamarlo con `http://` produce `0 Unknown Error`. Si IIS Express está detenido, ese puerto desaparece y también falla. Un `401` en `/api/auth/login` significa credenciales incorrectas o cuenta inexistente; no es un problema de CORS.
 
+### Con Docker Compose
+
+Requiere Docker Engine en ejecución. Desde la raíz del repositorio:
+
+```powershell
+Copy-Item .env.example .env   # ajuste las claves antes de usarlo en cualquier entorno compartido
+docker compose up -d --build
+```
+
+Servicios resultantes:
+
+| Servicio | URL | Notas |
+| --- | --- | --- |
+| Frontend | `http://localhost:4200` | Nginx sirve el build de Angular y escribe `config.json` desde `API_URL`. |
+| API | `http://localhost:5080/swagger` | Swagger disponible porque Compose usa `Development`. |
+| SQL Server | `localhost,1433` | Base `ImportaYa`; las migraciones se aplican al iniciar la API. |
+
+Credenciales por defecto en el entorno local: `admin@demo.com` / `Admin12345`. Para detener y borrar la base:
+
+```powershell
+docker compose down -v
+```
+
+Si accede desde otro equipo, cambie `API_URL` en `.env` por la IP/hostname del servidor (por ejemplo `http://192.168.1.10:5080/api`).
+
 ## Probar
 
 ```powershell
@@ -190,7 +233,7 @@ cd frontend
 npm test -- --watch=false
 ```
 
-Backend: **22 de dominio + 15 de aplicación + 14 de infraestructura + 14 de integración = 65 pruebas**.
+Backend: **22 de dominio + 15 de aplicación + 15 de infraestructura + 15 de integración = 67 pruebas** (incluye el reporter de SignalR y el listado de usuarios importados).
 Frontend: **4 pruebas** (componente raíz y servicio de autenticación).
 
 Las pruebas de integración crean una base de datos LocalDB con nombre aleatorio, siembran el administrador y dos duplicados contra BD, limpian las tablas de importación antes de cada test y eliminan la base al terminar. Incluyen login sin autorización (401), creación de cuenta por Admin, acceso denegado a `Usuario` (403) y las cargas reales de 1.200 filas.
@@ -231,6 +274,8 @@ Todas las rutas salvo `POST /api/auth/login` y `POST /api/auth/register` requier
 | `GET` | `/api/imports/{id}` | Admin, Usuario | Estado y contadores del trabajo. |
 | `GET` | `/api/imports/{id}/log` | Admin, Usuario | Log paginado; `tipo=Error|Duplicado`; `formato=csv|xlsx` descarga el log. |
 | `GET` | `/api/imports/plantilla?formato=csv\|xlsx` | Admin, Usuario | Descarga la plantilla con el encabezado exacto. |
+| `GET` | `/api/users?q=&page=&pageSize=` | Admin, Usuario | Usuarios importados paginados; `q` busca por documento, nombre, correo o teléfono. |
+| `WS` | `/hubs/imports` | Admin, Usuario | Hub SignalR; `JoinJob(jobId)` / `LeaveJob(jobId)` y evento `progress`. |
 
 Formato del archivo (primera fila = encabezado):
 
@@ -247,12 +292,12 @@ Tipos admitidos: `CC`, `CE`, `TI`, `PAS`, `NIT`. `CC`/`CE`/`TI` y `NIT` son num�
 
 ![Pantalla de importación con progreso y log](docs/screenshots/frontend-imports.png)
 
+![Usuarios importados con búsqueda y paginación](docs/screenshots/frontend-users.png)
+
 ![Administración de usuarios y roles](docs/screenshots/frontend-accounts.png)
 
 ![Swagger de la API](docs/screenshots/api-swagger.png)
 
-## Próximas fases
+## Cierre
 
-1. Fase 3 — SignalR para progreso en tiempo real (sin cambiar `ImportProcessor`).
-2. Fase 5 — Docker y docker-compose.
-3. Fase 6 — Pipeline de Azure DevOps y cierre de documentación.
+Las seis fases quedan cubiertas: importación asíncrona con log de errores y duplicados, autenticación con roles y registro público, progreso en tiempo real, frontend completo con usuarios importados, ejecución reproducible con Docker Compose y CI/CD con Azure DevOps. No se almacenan secretos en el repositorio: todas las claves y contraseñas se suministran por variables de entorno.

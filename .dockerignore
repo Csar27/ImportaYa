@@ -1,0 +1,16 @@
+.git
+.github
+**/bin
+**/obj
+**/node_modules
+**/dist
+**/.angular
+.playwright-mcp
+App_Data
+TestResults
+coverage*.xml
+coverage*.json
+.env
+.env.*
+!.env.example
+docs/screenshots/*.png

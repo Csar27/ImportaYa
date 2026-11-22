@@ -53,6 +53,15 @@ export interface CreateImportResult {
   status: string;
 }
 
+export interface ImportProgressEvent {
+  jobId: string;
+  processed: number;
+  created: number;
+  errors: number;
+  duplicates: number;
+  status: ImportStatus;
+}
+
 export type LogTipo = 'Error' | 'Duplicado';
 
 export interface ImportLogEntry {
@@ -64,6 +73,16 @@ export interface ImportLogEntry {
   tipo: LogTipo;
   motivo: string;
   fecha: string;
+}
+
+export interface ImportedUser {
+  id: number;
+  tipoDocumento: string;
+  documento: string;
+  nombre: string;
+  email: string;
+  telefono: string | null;
+  createdAt: string;
 }
 
 export interface Account {
